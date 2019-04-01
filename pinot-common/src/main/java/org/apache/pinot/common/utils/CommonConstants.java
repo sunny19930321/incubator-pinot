@@ -35,8 +35,16 @@ public class CommonConstants {
 
     public static final String SERVER_INSTANCE_TYPE = "server";
     public static final String BROKER_INSTANCE_TYPE = "broker";
+    public static final String CONTROLLER_INSTANCE_TYPE = "controller";
 
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
+    public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
+
+    public static final String MASTER_SLAVE_STATE_MODEL_DEFINITION = "MasterSlave";
+
+    // Hard code the number of partitions to 17 since it's rarely changed.
+    public static final int DEFAULT_NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 17;
+    public static final int DEFAULT_NUMBER_OF_CONTROLLER_REPLICAS = 3;
 
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";

@@ -41,6 +41,7 @@ import org.apache.helix.messaging.handling.HelixTaskExecutor;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.Message.MessageType;
 import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
@@ -64,26 +65,35 @@ public class HelixSetupUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixSetupUtils.class);
 
   public static synchronized HelixManager setup(String helixClusterName, String zkPath,
-      String pinotControllerInstanceId, boolean isUpdateStateModel, boolean enableBatchMessageMode) {
-
+      String pinotControllerInstanceId, boolean isUpdateStateModel, boolean enableBatchMessageMode,
+      boolean enableLeadControllerResource) {
     try {
-      createHelixClusterIfNeeded(helixClusterName, zkPath, isUpdateStateModel, enableBatchMessageMode);
+      setupHelixCluster(helixClusterName, zkPath, isUpdateStateModel, enableBatchMessageMode,
+          enableLeadControllerResource);
     } catch (final Exception e) {
-      LOGGER.error("Caught exception", e);
+      LOGGER.error("Caught exception when setting up Helix cluster: {}", helixClusterName, e);
       return null;
     }
 
     try {
       return startHelixControllerInStandadloneMode(helixClusterName, zkPath, pinotControllerInstanceId);
     } catch (final Exception e) {
-      LOGGER.error("Caught exception", e);
+      LOGGER.error("Caught exception when starting helix controller", e);
       return null;
     }
   }
 
-  public static void createHelixClusterIfNeeded(String helixClusterName, String zkPath, boolean isUpdateStateModel,
-      boolean enableBatchMessageMode) {
+  public static void setupHelixCluster(String helixClusterName, String zkPath, boolean isUpdateStateModel,
+      boolean enableBatchMessageMode, boolean enableLeadControllerResource) {
     final HelixAdmin admin = new ZKHelixAdmin(zkPath);
+
+    createHelixClusterIfNeeded(helixClusterName, zkPath, admin, isUpdateStateModel, enableBatchMessageMode);
+
+    createLeadControllerResourceIfNeeded(helixClusterName, admin, enableBatchMessageMode, enableLeadControllerResource);
+  }
+
+  public static void createHelixClusterIfNeeded(String helixClusterName, String zkPath, HelixAdmin admin,
+      boolean isUpdateStateModel, boolean enableBatchMessageMode) {
     final String segmentStateModelName =
         PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL;
 
@@ -174,5 +184,41 @@ public class HelixSetupUtils {
     LOGGER.info("Starting Helix Standalone Controller ... ");
     return HelixControllerMain
         .startHelixController(zkUrl, helixClusterName, pinotControllerInstanceId, HelixControllerMain.STANDALONE);
+  }
+
+  private static void createLeadControllerResourceIfNeeded(String helixClusterName, HelixAdmin admin,
+      boolean enableBatchMessageMode, boolean enableLeadControllerResource) {
+    List<String> resources = admin.getResourcesInCluster(helixClusterName);
+    if (!resources.contains(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME)) {
+      LOGGER.info("Cluster {} doesn't contain {}. Creating one..", helixClusterName,
+          CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+
+      admin.addStateModelDef(helixClusterName, CommonConstants.Helix.MASTER_SLAVE_STATE_MODEL_DEFINITION,
+          MasterSlaveSMD.build());
+
+      HelixHelper.updateResourceConfigsFor(new HashMap<>(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME,
+          helixClusterName, admin);
+      admin.addResource(helixClusterName, CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME,
+          CommonConstants.Helix.DEFAULT_NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE,
+          CommonConstants.Helix.MASTER_SLAVE_STATE_MODEL_DEFINITION, IdealState.RebalanceMode.FULL_AUTO.toString());
+
+      // Set instance group tag for lead controller resource.
+      IdealState leadControllerIdealState =
+          admin.getResourceIdealState(helixClusterName, CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+      leadControllerIdealState.setInstanceGroupTag(CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE);
+      leadControllerIdealState.setBatchMessageMode(enableBatchMessageMode);
+      admin.setResourceIdealState(helixClusterName, CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME,
+          leadControllerIdealState);
+    }
+
+    LOGGER.info("Re-balance lead controller resource with replicas: {}",
+        CommonConstants.Helix.DEFAULT_NUMBER_OF_CONTROLLER_REPLICAS);
+    admin.rebalance(helixClusterName, CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME,
+        CommonConstants.Helix.DEFAULT_NUMBER_OF_CONTROLLER_REPLICAS);
+
+    // Enable or disable lead controller resource.
+    LOGGER.info("{} lead controller resource.", enableLeadControllerResource ? "Enabling" : "Disabling");
+    admin.enableResource(helixClusterName, CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME,
+        enableLeadControllerResource);
   }
 }

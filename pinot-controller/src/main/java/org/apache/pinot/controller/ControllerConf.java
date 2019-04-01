@@ -32,7 +32,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.filesystem.LocalPinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +57,8 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONSOLE_WEBAPP_USE_HTTPS = "controller.query.console.useHttps";
   private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   private static final String CONTROLLER_MODE = "controller.mode";
+  private static final String NUMBER_OF_CONTROLLER_REPLICAS = "controller.number.replicas";
+  private static final String NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = "controller.number.partitions";
 
   public enum ControllerMode {
     DUAL,
@@ -134,6 +135,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
 
   private static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
+  private static final String ENABLE_LEAD_CONTROLLER_RESOURCE = "controller.enable.lead.controller.resource";
 
   // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
@@ -151,6 +153,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
   private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
+  private static final boolean DEFAULT_ENABLE_LEAD_CONTROLLER_RESOURCE = false;
   private static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
@@ -576,6 +579,14 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public boolean getEnableBatchMessageMode() {
     return getBoolean(ENABLE_BATCH_MESSAGE_MODE, DEFAULT_ENABLE_BATCH_MESSAGE_MODE);
+  }
+
+  public boolean getEnableLeadControllerResource() {
+    return getBoolean(ENABLE_LEAD_CONTROLLER_RESOURCE, DEFAULT_ENABLE_LEAD_CONTROLLER_RESOURCE);
+  }
+
+  public void setEnableLeadControllerResource(boolean enableLeadControllerResource) {
+    setProperty(ENABLE_LEAD_CONTROLLER_RESOURCE, enableLeadControllerResource);
   }
 
   public int getSegmentLevelValidationIntervalInSeconds() {
