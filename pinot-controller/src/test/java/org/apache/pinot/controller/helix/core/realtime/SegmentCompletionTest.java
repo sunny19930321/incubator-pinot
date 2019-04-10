@@ -1194,15 +1194,15 @@ public class SegmentCompletionTest {
       this(createMockHelixManager(isLeader, isConnected), segmentManager, isLeader, isConnected);
     }
 
-    protected MockSegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager, boolean isLeader,
-        boolean isConnected) {
+    protected MockSegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
+        boolean isLeader, boolean isConnected) {
       this(helixManager, segmentManager, isLeader, isConnected, new ControllerLeadershipManager(helixManager));
     }
 
     protected MockSegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
         boolean isLeader, boolean isConnected, ControllerLeadershipManager controllerLeadershipManager) {
       super(helixManager, segmentManager, new ControllerMetrics(new MetricsRegistry()),
-          controllerLeadershipManager);
+          SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds(), controllerLeadershipManager);
       _isLeader = isLeader;
     }
 

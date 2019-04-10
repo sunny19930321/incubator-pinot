@@ -64,9 +64,11 @@ public class PinotTableIdealStateBuilder {
   public static IdealState buildEmptyIdealStateFor(String tableName, int numCopies, boolean enableBatchMessageMode) {
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(tableName);
     final int replicas = numCopies;
-    customModeIdealStateBuilder
-        .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
-        .setNumPartitions(0).setNumReplica(replicas).setMaxPartitionsPerNode(1);
+    customModeIdealStateBuilder.setStateModel(
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
+        .setNumPartitions(0)
+        .setNumReplica(replicas)
+        .setMaxPartitionsPerNode(1);
     final IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setInstanceGroupTag(tableName);
     idealState.setBatchMessageMode(enableBatchMessageMode);
@@ -88,7 +90,8 @@ public class PinotTableIdealStateBuilder {
         new CustomModeISBuilder(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     customModeIdealStateBuilder.setStateModel(
         PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL)
-        .setMaxPartitionsPerNode(Integer.MAX_VALUE).setNumReplica(Integer.MAX_VALUE)
+        .setMaxPartitionsPerNode(Integer.MAX_VALUE)
+        .setNumReplica(Integer.MAX_VALUE)
         .setNumPartitions(Integer.MAX_VALUE);
     final IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setBatchMessageMode(enableBatchMessageMode);
@@ -118,8 +121,9 @@ public class PinotTableIdealStateBuilder {
     return idealState;
   }
 
-  public static void buildLowLevelRealtimeIdealStateFor(String realtimeTableName, TableConfig realtimeTableConfig,
-      IdealState idealState, boolean enableBatchMessageMode) {
+  public static void buildLowLevelRealtimeIdealStateFor(PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager,
+      String realtimeTableName, TableConfig realtimeTableConfig, IdealState idealState,
+      boolean enableBatchMessageMode) {
 
     // Validate replicasPerPartition here.
     final String replicasPerPartitionStr = realtimeTableConfig.getValidationConfig().getReplicasPerPartition();
@@ -136,9 +140,8 @@ public class PinotTableIdealStateBuilder {
     if (idealState == null) {
       idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, nReplicas, enableBatchMessageMode);
     }
-    final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
     try {
-      segmentManager.setupNewTable(realtimeTableConfig, idealState);
+      pinotLLCRealtimeSegmentManager.setupNewTable(realtimeTableConfig, idealState);
     } catch (InvalidConfigException e) {
       throw new IllegalStateException("Caught exception when creating table " + realtimeTableName, e);
     }
@@ -159,9 +162,11 @@ public class PinotTableIdealStateBuilder {
   public static IdealState buildEmptyRealtimeIdealStateFor(String realtimeTableName, int replicaCount,
       boolean enableBatchMessageMode) {
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(realtimeTableName);
-    customModeIdealStateBuilder
-        .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
-        .setNumPartitions(0).setNumReplica(replicaCount).setMaxPartitionsPerNode(1);
+    customModeIdealStateBuilder.setStateModel(
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
+        .setNumPartitions(0)
+        .setNumReplica(replicaCount)
+        .setMaxPartitionsPerNode(1);
     final IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setInstanceGroupTag(realtimeTableName);
     idealState.setBatchMessageMode(enableBatchMessageMode);

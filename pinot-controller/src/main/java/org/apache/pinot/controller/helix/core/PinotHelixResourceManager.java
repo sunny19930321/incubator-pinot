@@ -137,6 +137,8 @@ public class PinotHelixResourceManager {
   private ZkCacheBaseDataAccessor<ZNRecord> _cacheInstanceConfigsDataAccessor;
   private Builder _keyBuilder;
   private SegmentDeletionManager _segmentDeletionManager;
+  private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
+  private RebalanceSegmentStrategyFactory _rebalanceSegmentStrategyFactory;
   private TableRebalancer _tableRebalancer;
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
@@ -253,9 +255,8 @@ public class PinotHelixResourceManager {
    * Register and connect to Helix cluster as PARTICIPANT role.
    */
   private HelixManager registerAndConnectAsHelixParticipant() {
-    HelixManager helixManager = HelixManagerFactory
-        .getZKHelixManager(_helixClusterName, CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + _instanceId,
-            InstanceType.PARTICIPANT, _helixZkURL);
+    HelixManager helixManager = HelixManagerFactory.getZKHelixManager(_helixClusterName,
+        CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + _instanceId, InstanceType.PARTICIPANT, _helixZkURL);
     try {
       helixManager.connect();
       return helixManager;
@@ -525,8 +526,8 @@ public class PinotHelixResourceManager {
               // Segment is in error and we don't consider error state as different from target, therefore continue
             } else {
               // Will try to read data every 500 ms, only if external view not updated.
-              Uninterruptibles
-                  .sleepUninterruptibly(DEFAULT_EXTERNAL_VIEW_UPDATE_RETRY_INTERVAL_MILLIS, TimeUnit.MILLISECONDS);
+              Uninterruptibles.sleepUninterruptibly(DEFAULT_EXTERNAL_VIEW_UPDATE_RETRY_INTERVAL_MILLIS,
+                  TimeUnit.MILLISECONDS);
               continue deadlineLoop;
             }
           }
@@ -536,8 +537,8 @@ public class PinotHelixResourceManager {
         return true;
       } else {
         // Segment doesn't exist in EV, wait for a little bit
-        Uninterruptibles
-            .sleepUninterruptibly(DEFAULT_EXTERNAL_VIEW_UPDATE_RETRY_INTERVAL_MILLIS, TimeUnit.MILLISECONDS);
+        Uninterruptibles.sleepUninterruptibly(DEFAULT_EXTERNAL_VIEW_UPDATE_RETRY_INTERVAL_MILLIS,
+            TimeUnit.MILLISECONDS);
       }
     }
 
@@ -579,8 +580,7 @@ public class PinotHelixResourceManager {
     return PinotResourceManagerResponse.SUCCESS;
   }
 
-  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(String tableNameWithType)
-      throws Exception {
+  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(String tableNameWithType) throws Exception {
     TableConfig tableConfig;
     try {
       tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
@@ -602,8 +602,8 @@ public class PinotHelixResourceManager {
     IdealState brokerIdealState = HelixHelper.getBrokerIdealStates(_helixAdmin, _helixClusterName);
     Set<String> brokerInstancesInIdealState = brokerIdealState.getInstanceSet(tableNameWithType);
     if (brokerInstancesInIdealState.equals(brokerInstances)) {
-      return PinotResourceManagerResponse
-          .success("Broker resource is not rebuilt because ideal state is the same for table: " + tableNameWithType);
+      return PinotResourceManagerResponse.success(
+          "Broker resource is not rebuilt because ideal state is the same for table: " + tableNameWithType);
     }
 
     // Update ideal state with the new broker instances
@@ -639,8 +639,8 @@ public class PinotHelixResourceManager {
         tableIdealState.setPartitionState(tableNameWithType, instanceName, BrokerOnlineOfflineStateModel.ONLINE);
       }
     }
-    _helixAdmin
-        .setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, tableIdealState);
+    _helixAdmin.setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
+        tableIdealState);
   }
 
   private PinotResourceManagerResponse scaleDownBroker(Tenant tenant, String brokerTenantTag,
@@ -788,8 +788,8 @@ public class PinotHelixResourceManager {
   public boolean isServerTenantDeletable(String tenantName) {
     Set<String> taggedInstances = new HashSet<>(
         HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getOfflineTagForTenant(tenantName)));
-    taggedInstances
-        .addAll(HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getRealtimeTagForTenant(tenantName)));
+    taggedInstances.addAll(
+        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getRealtimeTagForTenant(tenantName)));
     for (String resourceName : getAllResources()) {
       if (!TableNameBuilder.isTableResource(resourceName)) {
         continue;
@@ -812,9 +812,8 @@ public class PinotHelixResourceManager {
     for (String instanceName : instancesInCluster) {
       InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
       for (String tag : config.getTags()) {
-        if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE) || tag
-            .equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE) || tag
-            .equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
+        if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE) || tag.equals(
+            CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE) || tag.equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
           continue;
         }
         TenantRole tenantRole;
@@ -838,9 +837,8 @@ public class PinotHelixResourceManager {
     for (String instanceName : instancesInCluster) {
       InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
       for (String tag : config.getTags()) {
-        if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE) || tag
-            .equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE) || tag
-            .equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
+        if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE) || tag.equals(
+            CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE) || tag.equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
           continue;
         }
         TenantRole tenantRole;
@@ -1027,9 +1025,8 @@ public class PinotHelixResourceManager {
   }
 
   public List<String> getSchemaNames() {
-    return _propertyStore
-        .getChildNames(PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(),
-            AccessOption.PERSISTENT);
+    return _propertyStore.getChildNames(
+        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT);
   }
 
   /**
@@ -1037,8 +1034,7 @@ public class PinotHelixResourceManager {
    * @throws InvalidTableConfigException
    * @throws TableAlreadyExistsException for offline tables only if the table already exists
    */
-  public void addTable(@Nonnull TableConfig tableConfig)
-      throws IOException {
+  public void addTable(@Nonnull TableConfig tableConfig) throws IOException {
     final String tableNameWithType = tableConfig.getTableName();
 
     TenantConfig tenantConfig;
@@ -1107,9 +1103,8 @@ public class PinotHelixResourceManager {
         }
         // now lets build an ideal state
         LOGGER.info("building empty ideal state for table : " + tableNameWithType);
-        final IdealState offlineIdealState = PinotTableIdealStateBuilder
-            .buildEmptyIdealStateFor(tableNameWithType, Integer.parseInt(segmentsConfig.getReplication()),
-                _enableBatchMessageMode);
+        final IdealState offlineIdealState = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(tableNameWithType,
+            Integer.parseInt(segmentsConfig.getReplication()), _enableBatchMessageMode);
         LOGGER.info("adding table via the admin");
         _helixAdmin.addResource(_helixClusterName, tableNameWithType, offlineIdealState);
         LOGGER.info("successfully added the table : " + tableNameWithType + " to the cluster");
@@ -1215,6 +1210,14 @@ public class PinotHelixResourceManager {
     }
   }
 
+  public void registerPinotLLCRealtimeSegmentManager(PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager) {
+    _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
+  }
+
+  public void registerRebalanceSegmentStrategyFactory(RebalanceSegmentStrategyFactory rebalanceSegmentStrategyFactory) {
+    _rebalanceSegmentStrategyFactory = rebalanceSegmentStrategyFactory;
+  }
+
   private void ensureRealtimeClusterIsSetUp(TableConfig config, String realtimeTableName,
       IndexingConfig indexingConfig) {
     StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
@@ -1234,7 +1237,7 @@ public class PinotHelixResourceManager {
         // Only high-level consumer specified in the config.
         createHelixEntriesForHighLevelConsumer(config, realtimeTableName, idealState);
         // Clean up any LLC table if they are present
-        PinotLLCRealtimeSegmentManager.getInstance().cleanupLLC(realtimeTableName);
+        _pinotLLCRealtimeSegmentManager.cleanupLLC(realtimeTableName);
       }
     }
 
@@ -1243,8 +1246,8 @@ public class PinotHelixResourceManager {
       // Will either create idealstate entry, or update the IS entry with new segments
       // (unless there are low-level segments already present)
       if (ZKMetadataProvider.getLLCRealtimeSegments(_propertyStore, realtimeTableName).isEmpty()) {
-        PinotTableIdealStateBuilder
-            .buildLowLevelRealtimeIdealStateFor(realtimeTableName, config, idealState, _enableBatchMessageMode);
+        PinotTableIdealStateBuilder.buildLowLevelRealtimeIdealStateFor(_pinotLLCRealtimeSegmentManager,
+            realtimeTableName, config, idealState, _enableBatchMessageMode);
         LOGGER.info("Successfully added Helix entries for low-level consumers for {} ", realtimeTableName);
       } else {
         LOGGER.info("LLC is already set up for table {}, not configuring again", realtimeTableName);
@@ -1255,9 +1258,8 @@ public class PinotHelixResourceManager {
   private void createHelixEntriesForHighLevelConsumer(TableConfig config, String realtimeTableName,
       IdealState idealState) {
     if (idealState == null) {
-      idealState = PinotTableIdealStateBuilder
-          .buildInitialHighLevelRealtimeIdealStateFor(realtimeTableName, config, _helixZkManager, _propertyStore,
-              _enableBatchMessageMode);
+      idealState = PinotTableIdealStateBuilder.buildInitialHighLevelRealtimeIdealStateFor(realtimeTableName, config,
+          _helixZkManager, _propertyStore, _enableBatchMessageMode);
       LOGGER.info("Adding helix resource with empty HLC IdealState for {}", realtimeTableName);
       _helixAdmin.addResource(_helixClusterName, realtimeTableName, idealState);
     } else {
@@ -1272,8 +1274,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void setExistingTableConfig(TableConfig config, String tableNameWithType, TableType type)
-      throws IOException {
+  public void setExistingTableConfig(TableConfig config, String tableNameWithType, TableType type) throws IOException {
     if (type == TableType.REALTIME) {
       ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, config.toZNRecord());
       ensureRealtimeClusterIsSetUp(config, tableNameWithType, config.getIndexingConfig());
@@ -1284,7 +1285,8 @@ public class PinotHelixResourceManager {
       ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType, config.toZNRecord());
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
       final String configReplication = config.getValidationConfig().getReplication();
-      if (configReplication != null && !config.getValidationConfig().getReplication()
+      if (configReplication != null && !config.getValidationConfig()
+          .getReplication()
           .equals(idealState.getReplicas())) {
         HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, new Function<IdealState, IdealState>() {
           @Nullable
@@ -1298,8 +1300,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void updateMetadataConfigFor(String tableName, TableType type, TableCustomConfig newConfigs)
-      throws Exception {
+  public void updateMetadataConfigFor(String tableName, TableType type, TableCustomConfig newConfigs) throws Exception {
     String tableNameWithType = TableNameBuilder.forType(type).tableNameWithType(tableName);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     if (tableConfig == null) {
@@ -1310,8 +1311,7 @@ public class PinotHelixResourceManager {
   }
 
   public void updateSegmentsValidationAndRetentionConfigFor(String tableName, TableType type,
-      SegmentsValidationAndRetentionConfig newConfigs)
-      throws Exception {
+      SegmentsValidationAndRetentionConfig newConfigs) throws Exception {
     String tableNameWithType = TableNameBuilder.forType(type).tableNameWithType(tableName);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     if (tableConfig == null) {
@@ -1321,8 +1321,7 @@ public class PinotHelixResourceManager {
     setExistingTableConfig(tableConfig, tableNameWithType, type);
   }
 
-  public void updateIndexingConfigFor(String tableName, TableType type, IndexingConfig newConfigs)
-      throws Exception {
+  public void updateIndexingConfigFor(String tableName, TableType type, IndexingConfig newConfigs) throws Exception {
     String tableNameWithType = TableNameBuilder.forType(type).tableNameWithType(tableName);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     if (tableConfig == null) {
@@ -1449,8 +1448,8 @@ public class PinotHelixResourceManager {
       }
     }
 
-    return (status) ? PinotResourceManagerResponse
-        .success("Table " + tableName + " enabled (reset success = " + resetSuccessful + ")")
+    return (status) ? PinotResourceManagerResponse.success(
+        "Table " + tableName + " enabled (reset success = " + resetSuccessful + ")")
         : PinotResourceManagerResponse.success("Table " + tableName + " disabled");
   }
 
@@ -1654,8 +1653,8 @@ public class PinotHelixResourceManager {
     if (customConfig != null) {
       Map<String, String> customConfigMap = customConfig.getCustomConfigs();
       if (customConfigMap != null) {
-        if (customConfigMap.containsKey(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY) && !Boolean
-            .valueOf(customConfigMap.get(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY))) {
+        if (customConfigMap.containsKey(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY) && !Boolean.valueOf(
+            customConfigMap.get(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY))) {
           return false;
         }
       }
@@ -1727,11 +1726,10 @@ public class PinotHelixResourceManager {
     Preconditions.checkNotNull(offlineTableConfig);
     int numReplicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
     String serverTenant = TagNameUtils.getOfflineTagForTenant(offlineTableConfig.getTenantConfig().getServer());
-    SegmentAssignmentStrategy segmentAssignmentStrategy = SegmentAssignmentStrategyFactory
-        .getSegmentAssignmentStrategy(offlineTableConfig.getValidationConfig().getSegmentAssignmentStrategy());
-    return segmentAssignmentStrategy
-        .getAssignedInstances(_helixZkManager, _helixAdmin, _propertyStore, _helixClusterName, segmentMetadata,
-            numReplicas, serverTenant);
+    SegmentAssignmentStrategy segmentAssignmentStrategy = SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(
+        offlineTableConfig.getValidationConfig().getSegmentAssignmentStrategy());
+    return segmentAssignmentStrategy.getAssignedInstances(_helixZkManager, _helixAdmin, _propertyStore,
+        _helixClusterName, segmentMetadata, numReplicas, serverTenant);
   }
 
   /**
@@ -1796,9 +1794,9 @@ public class PinotHelixResourceManager {
     LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
     if (!ifExternalViewChangeReflectedForState(tableName, segmentName, "OFFLINE",
         _externalViewOnlineToOfflineTimeoutMillis, false)) {
-      LOGGER
-          .error("External view for segment {} did not reflect the ideal state of OFFLINE within the {} ms time limit",
-              segmentName, _externalViewOnlineToOfflineTimeoutMillis);
+      LOGGER.error(
+          "External view for segment {} did not reflect the ideal state of OFFLINE within the {} ms time limit",
+          segmentName, _externalViewOnlineToOfflineTimeoutMillis);
       return false;
     }
 
@@ -1817,8 +1815,8 @@ public class PinotHelixResourceManager {
     // Check that the ideal state has been written to ZK
     updatedIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
     instanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
-    LOGGER
-        .info("Found {} instances for segment '{}', after updating ideal state", instanceStateMap.size(), segmentName);
+    LOGGER.info("Found {} instances for segment '{}', after updating ideal state", instanceStateMap.size(),
+        segmentName);
     for (String state : instanceStateMap.values()) {
       if (!"ONLINE".equals(state)) {
         LOGGER.error("Failed to write ONLINE ideal state!");
@@ -1966,8 +1964,8 @@ public class PinotHelixResourceManager {
       Map<String, String> instanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
       for (String state : instanceStateMap.values()) {
         if (!status.equals(state)) {
-          return PinotResourceManagerResponse
-              .failure("Failed to update ideal state when setting status " + status + " for segment " + segmentName);
+          return PinotResourceManagerResponse.failure(
+              "Failed to update ideal state when setting status " + status + " for segment " + segmentName);
         }
       }
 
@@ -1977,8 +1975,8 @@ public class PinotHelixResourceManager {
       }
     }
 
-    return (externalViewUpdateSuccessful) ? PinotResourceManagerResponse
-        .success("Segments " + segments + " now " + status)
+    return (externalViewUpdateSuccessful) ? PinotResourceManagerResponse.success(
+        "Segments " + segments + " now " + status)
         : PinotResourceManagerResponse.failure("Timed out. External view not completely updated");
   }
 
@@ -2106,8 +2104,8 @@ public class PinotHelixResourceManager {
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
       for (String partition : idealState.getPartitionSet()) {
         if (idealState.getInstanceSet(partition).contains(instanceName)) {
-          return PinotResourceManagerResponse
-              .failure("Instance " + instanceName + " exists in ideal state for " + resource);
+          return PinotResourceManagerResponse.failure(
+              "Instance " + instanceName + " exists in ideal state for " + resource);
         }
       }
     }
@@ -2186,8 +2184,7 @@ public class PinotHelixResourceManager {
 
   @Nonnull
   public RebalanceResult rebalanceTable(final String rawTableName, TableType tableType,
-      Configuration rebalanceUserConfig)
-      throws InvalidConfigException, TableNotFoundException {
+      Configuration rebalanceUserConfig) throws InvalidConfigException, TableNotFoundException {
 
     TableConfig tableConfig = getTableConfig(rawTableName, tableType);
     if (tableConfig == null) {
@@ -2198,7 +2195,7 @@ public class PinotHelixResourceManager {
     RebalanceResult result;
     try {
       RebalanceSegmentStrategy rebalanceSegmentsStrategy =
-          RebalanceSegmentStrategyFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
+          _rebalanceSegmentStrategyFactory.getRebalanceSegmentsStrategy(tableConfig);
       result = _tableRebalancer.rebalance(tableConfig, rebalanceSegmentsStrategy, rebalanceUserConfig);
     } catch (InvalidConfigException e) {
       LOGGER.error("Exception in rebalancing config for table {}", tableNameWithType, e);
