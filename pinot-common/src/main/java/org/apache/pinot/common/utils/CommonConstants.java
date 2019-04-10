@@ -130,6 +130,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START = "pinot.broker.startup.minResourcePercent";
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
 
+    // [PINOT-2435] setting to 0 so it doesn't disconnect from zk
+    public static final String CONFIG_OF_HELIX_FLAPPING_TIME_WINDOW_MS = "pinot.broker.helix.flappingTimeWindowMs";
+    public static final String DEFAULT_HELIX_FLAPPING_TIME_WINDOW_MS = "0";
+
     public static class Request {
       public static final String PQL = "pql";
       public static final String TRACE = "trace";

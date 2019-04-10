@@ -19,11 +19,15 @@
 package org.apache.pinot.broker.broker.helix;
 
 import org.apache.helix.HelixConstants;
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
 
 
 /**
  * Handles cluster changes such as external view changes, instance config changes, live instance changes etc.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public interface ClusterChangeHandler {
 
   /**
